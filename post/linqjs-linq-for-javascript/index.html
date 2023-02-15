@@ -1,0 +1,330 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>linq.js - LINQ for JavaScript  | zhsun999</title>
+<link rel="shortcut icon" href="https://zhsun999.github.io/favicon.ico?v=1676462925167">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@2.3.0/fonts/remixicon.css" rel="stylesheet">
+<link rel="stylesheet" href="https://zhsun999.github.io/styles/main.css">
+<link rel="alternate" type="application/atom+xml" title="linq.js - LINQ for JavaScript  | zhsun999 - Atom Feed" href="https://zhsun999.github.io/atom.xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Droid+Serif:400,700">
+
+
+
+    <meta name="description" content="这里给大家推荐个js实现的linq，项目地址:mihaifm/linq
+使用举例
+let strs = ['a', 'b', 'c', 'd', 'e']
+Enumerable.from(strs)
+    .select((str, in..." />
+    <meta name="keywords" content="" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+    <script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+  </head>
+  <body>
+    <div class="main">
+      <div class="main-content">
+        <div class="site-header">
+  <a href="https://zhsun999.github.io">
+  <img class="avatar" src="https://zhsun999.github.io/images/avatar.png?v=1676462925167" alt="">
+  </a>
+  <h1 class="site-title">
+    zhsun999
+  </h1>
+  <p class="site-description">
+    温故而知新
+  </p>
+  <div class="menu-container">
+    
+      
+        <a href="/" class="menu">
+          首页
+        </a>
+      
+    
+      
+        <a href="/archives" class="menu">
+          归档
+        </a>
+      
+    
+      
+        <a href="/tags" class="menu">
+          标签
+        </a>
+      
+    
+      
+        <a href="/post/about" class="menu">
+          关于
+        </a>
+      
+    
+  </div>
+  <div class="social-container">
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+</div>
+
+        <div class="post-detail">
+          <article class="post">
+            <h2 class="post-title">
+              linq.js - LINQ for JavaScript 
+            </h2>
+            <div class="post-info">
+              <span>
+                2023-02-14
+              </span>
+              <span>
+                4 min read
+              </span>
+              
+            </div>
+            
+            <div class="post-content-wrapper">
+              <div class="post-content" v-pre>
+                <p>这里给大家推荐个js实现的linq，项目地址:<a href="https://github.com/mihaifm/linq">mihaifm/linq</a></p>
+<h3 id="使用举例">使用举例</h3>
+<pre><code class="language-js">let strs = ['a', 'b', 'c', 'd', 'e']
+Enumerable.from(strs)
+    .select((str, index) =&gt; ({
+        str: str,
+        index: index
+    }))
+    .where(obj =&gt; obj.index &gt; 2)
+    .forEach(obj =&gt; console.log(obj))
+//output
+//{ str: 'd', index: 3 }
+//{ str: 'e', index: 4 }
+</code></pre>
+<h3 id="优点">优点</h3>
+<ul>
+<li>对于.net开发人员很快就能上手</li>
+<li>相比es6的map/reduce额外有更多的方法，如计数、分组、连接、交集差集等，能够更方便的处理数据</li>
+</ul>
+<pre><code class="language-js">//对比统计大于2的number的方式
+let data = Enumerable.range(1, 5).toArray()
+console.log(
+    data.map(num =&gt; num &gt; 2 ? 1 : 0)
+        .reduce((num1, num2) =&gt; num1 + num2)
+)
+console.log(
+    Enumerable.from(data)
+        .count(num =&gt; num &gt; 2)
+)
+//output
+//3
+//3
+</code></pre>
+<h3 id="安装使用">安装使用</h3>
+<p>执行<code>npm install linq</code>安装<br>
+引入<code>import Enumerable from &quot;linq&quot;</code>(node使用的话，在package.json中配置&quot;type&quot;: &quot;module&quot;)</p>
+<h3 id="一些使用举例">一些使用举例</h3>
+<pre><code class="language-js">//集合操作
+let data1 = [1, 2, 2, 3]
+let data2 = [2, 3, 4]
+console.log(
+    Enumerable.from(data1).distinct().toArray(),                        //去重
+    Enumerable.from(data1).concat(Enumerable.from(data2)).toArray(),    //交集不去重
+    Enumerable.from(data1).union(Enumerable.from(data2)).toArray(),     //交集并去重
+    Enumerable.from(data1).intersect(Enumerable.from(data2)).toArray(), //并集
+    Enumerable.from(data1).except(Enumerable.from(data2)).toArray(),    //差集
+)
+</code></pre>
+<pre><code class="language-js">//分组
+var data = [
+    {
+        &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+        &quot;name&quot;: &quot;zhsun&quot;,
+        &quot;operation&quot;: &quot;signIn&quot;
+    }, {
+        &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+        &quot;name&quot;: &quot;zhsun&quot;,
+        &quot;operation&quot;: &quot;signOut&quot;
+    }
+]
+console.log(
+    Enumerable.from(data)
+        .groupBy(obj =&gt; obj.name)
+        .select(igp =&gt; ({ name: igp.key(), count: igp.count() }))
+        .toArray()
+)
+//注意，不同于c#的是，如果keySelector是一个object，需要自己去实现compareSelector
+console.log(
+    Enumerable.from(data)
+        .groupBy(obj =&gt; ({ date: obj.date, name: obj.name }),                                    //key Selector 
+            obj =&gt; obj.operation,                                                                //element Selector 
+            (key, operations) =&gt; ({ name: key.name, date: key.date, count: operations.count() }),//result Selector  
+            key =&gt; JSON.stringify(key)                                                           //compare Selector 
+        )
+        .toArray()
+)
+//output
+//[ { name: 'zhsun', count: 2 } ]
+//[ { name: 'zhsun', date: '2022-08-08 00:15:20', count: 2 } ]
+</code></pre>
+<pre><code class="language-js">//连接
+let data1 = [{
+    &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+    &quot;name&quot;: &quot;zhsun&quot;,
+    &quot;roleId&quot;: 2
+}, {
+    &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+    &quot;name&quot;: &quot;fqh&quot;,
+    &quot;roleId&quot;: 1
+}, {
+    &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+    &quot;name&quot;: &quot;pp&quot;,
+    &quot;roleId&quot;: 3
+},]
+let data2 = [{
+    &quot;roleId&quot;: 1,
+    &quot;role&quot;: &quot;admin&quot;
+}, {
+    &quot;roleId&quot;: 2,
+    &quot;role&quot;: &quot;user&quot;
+}]
+console.log(
+    Enumerable.from(data1)
+        .join(data2,
+            obj1 =&gt; obj1.roleId,
+            obj2 =&gt; obj2.roleId,
+            (obj1, obj2) =&gt; ({
+                date: obj1.date,
+                name: obj1.name,
+                role: obj2.role
+            })
+        )
+        .toArray()
+)
+//output
+//[
+//  { date: '2022-08-08 00:15:20', name: 'zhsun', role: 'user' },
+//  { date: '2022-08-08 00:15:20', name: 'fqh', role: 'admin' }  
+//]
+</code></pre>
+<p>大部分c# linq的方法都有实现，使用方式也大致相仿，可以从<a href="https://learn.microsoft.com/zh-cn/dotnet/api/system.linq.enumerable.aggregate?view=net-7.0">MSDN-Enumerable.Aggregate 方法</a>开始阅读了解</p>
+<h3 id="项目中的使用">项目中的使用</h3>
+<p>目前为止，我主要用在了以下两个方面</p>
+<ul>
+<li>前端数据可视化时可能需要进行复杂数据转换，如用户以不同的key去groupBy绘制图表</li>
+<li>写node脚本时简化数据转换的操作</li>
+</ul>
+<h3 id="其他">其他</h3>
+<p>如果觉得这个库太小众，可以考虑<a href="https://www.lodashjs.com/">lodash</a></p>
+
+              </div>
+              <div class="toc-container">
+                <ul class="markdownIt-TOC">
+<li>
+<ul>
+<li>
+<ul>
+<li><a href="#%E4%BD%BF%E7%94%A8%E4%B8%BE%E4%BE%8B">使用举例</a></li>
+<li><a href="#%E4%BC%98%E7%82%B9">优点</a></li>
+<li><a href="#%E5%AE%89%E8%A3%85%E4%BD%BF%E7%94%A8">安装使用</a></li>
+<li><a href="#%E4%B8%80%E4%BA%9B%E4%BD%BF%E7%94%A8%E4%B8%BE%E4%BE%8B">一些使用举例</a></li>
+<li><a href="#%E9%A1%B9%E7%9B%AE%E4%B8%AD%E7%9A%84%E4%BD%BF%E7%94%A8">项目中的使用</a></li>
+<li><a href="#%E5%85%B6%E4%BB%96">其他</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+              </div>
+            </div>
+          </article>
+        </div>
+
+        
+
+        
+          
+            <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css">
+<script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+
+<div id="gitalk-container"></div>
+
+<script>
+
+  var gitalk = new Gitalk({
+    clientID: 'eb443028db34a4516aad',
+    clientSecret: '716699ffd88fab44c3b1628ba2e14000d46da9b9',
+    repo: 'zhsun999.github.io',
+    owner: 'zhsun999',
+    admin: ['zhsun999'],
+    id: (location.pathname).substring(0, 49),      // Ensure uniqueness and length less than 50
+    distractionFreeMode: false  // Facebook-like distraction free mode
+  })
+
+  gitalk.render('gitalk-container')
+
+</script>
+
+          
+
+          
+        
+
+        <div class="site-footer">
+  Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a>
+  <a class="rss" href="https://zhsun999.github.io/atom.xml" target="_blank">
+    <i class="ri-rss-line"></i> RSS
+  </a>
+</div>
+
+      </div>
+    </div>
+
+    <script>
+      hljs.initHighlightingOnLoad()
+
+      let mainNavLinks = document.querySelectorAll(".markdownIt-TOC a");
+
+      // This should probably be throttled.
+      // Especially because it triggers during smooth scrolling.
+      // https://lodash.com/docs/4.17.10#throttle
+      // You could do like...
+      // window.addEventListener("scroll", () => {
+      //    _.throttle(doThatStuff, 100);
+      // });
+      // Only not doing it here to keep this Pen dependency-free.
+
+      window.addEventListener("scroll", event => {
+        let fromTop = window.scrollY;
+
+        mainNavLinks.forEach((link, index) => {
+          let section = document.getElementById(decodeURI(link.hash).substring(1));
+          let nextSection = null
+          if (mainNavLinks[index + 1]) {
+            nextSection = document.getElementById(decodeURI(mainNavLinks[index + 1].hash).substring(1));
+          }
+          if (section.offsetTop <= fromTop) {
+            if (nextSection) {
+              if (nextSection.offsetTop > fromTop) {
+                link.classList.add("current");
+              } else {
+                link.classList.remove("current");    
+              }
+            } else {
+              link.classList.add("current");
+            }
+          } else {
+            link.classList.remove("current");
+          }
+        });
+      });
+
+    </script>
+  </body>
+</html>
