@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://zhsun999.github.io</id>
+    <title>zhsun999</title>
+    <updated>2023-03-20T14:07:16.491Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="https://zhsun999.github.io"/>
+    <link rel="self" href="https://zhsun999.github.io/atom.xml"/>
+    <subtitle>温故而知新</subtitle>
+    <logo>https://zhsun999.github.io/images/avatar.png</logo>
+    <icon>https://zhsun999.github.io/favicon.ico</icon>
+    <rights>All rights reserved 2023, zhsun999</rights>
+    <entry>
+        <title type="html"><![CDATA[Orleans简单使用]]></title>
+        <id>https://zhsun999.github.io/post/orleans-jian-dan-shi-yong/</id>
+        <link href="https://zhsun999.github.io/post/orleans-jian-dan-shi-yong/">
+        </link>
+        <updated>2023-03-20T13:32:59.000Z</updated>
+        <content type="html"><![CDATA[<p>.NET7更新后Orleans也随着更新了一个大版本，但是感觉微软官方的文档并不是很好，这里写个小demo来演示简单的集群管理(本次使用redis，官方文档甚至都没有提过redis)，可以参考<a href="https://learn.microsoft.com/zh-cn/dotnet/orleans/implementation/cluster-management">Orleans 中的群集管理</a></p>
+<h2 id="创建项目">创建项目</h2>
+<h3 id="创建文件夹">创建文件夹</h3>
+<pre><code class="language-bat">mkdir Client
+mkdir Server
+mkdir Grain
+mkdir IGrain
+mkdir Model
+</code></pre>
+<h3 id="初始化代码">初始化代码</h3>
+<pre><code class="language-bat">cd Server
+dotnet new webapi -minimal
+cd ../Client
+dotnet new console
+cd ../Grain
+dotnet new classlib
+cd ../IGrain
+dotnet new classlib
+cd ../Model
+dotnet new classlib
+</code></pre>
+<h3 id="添加项目引用">添加项目引用</h3>
+<pre><code class="language-bat">cd ../Server
+dotnet add reference ../Grain/Grain.csproj
+cd ../Client
+dotnet add reference ../IGrain/IGrain.csproj
+cd ../IGrain
+dotnet add reference ../Model/Model.csproj
+cd ../Grain
+dotnet add reference ../IGrain/IGrain.csproj
+</code></pre>
+<h3 id="添加包引用">添加包引用</h3>
+<pre><code class="language-bat">cd ../Server
+dotnet add package Microsoft.Orleans.Server
+dotnet add package Orleans.Clustering.Redis
+dotnet add package Orleans.Persistence.Redis
+cd ../Client
+dotnet add package Microsoft.Extensions.Hosting
+dotnet add package Microsoft.Extensions.Configuration.CommandLine
+dotnet add package Microsoft.Extensions.Configuration.EnvironmentVariables
+dotnet add package Microsoft.Orleans.Client
+dotnet add package Orleans.Clustering.Redis
+cd ../Model
+dotnet add package Microsoft.Orleans.Sdk
+cd ../IGrain
+dotnet add package Microsoft.Orleans.Sdk
+cd ../Grain
+dotnet add package Microsoft.Orleans.Sdk
+</code></pre>
+<h3 id="添加代码">添加代码</h3>
+<p>Model:</p>
+<pre><code class="language-c#">//File:Message
+namespace Model;
+[GenerateSerializer]
+public class Message
+{
+    [Id(0)]
+    public string Ip { get; set; }
+}
+</code></pre>
+<p>IGrain:</p>
+<pre><code class="language-c#">//File:IMessageHandler.cs
+using Model;
+namespace IGrain;
+public interface IMessageHandler : IGrainWithIntegerKey
+{
+    ValueTask&lt;string&gt; Send(Message message);
+}
+
+</code></pre>
+<p>Grain:</p>
+<pre><code class="language-c#">//File:MessageHandler.cs
+using IGrain;
+using Model;
+namespace Grain;
+public class MessageHandler : IMessageHandler
+{
+    public ValueTask&lt;string&gt; Send(Message message)
+    {
+        Console.WriteLine($&quot;[DateTime] {DateTime.Now} [Message:Ip] {message.Ip}&quot;);
+        return ValueTask.FromResult(&quot;ok&quot;);
+    }
+}
+</code></pre>
+<p>Server:</p>
+<pre><code class="language-c#">//File:Program.cs
+using Orleans.Hosting;
+var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseOrleans((ctx, orleansBuilder) =&gt;
+{
+    var redisAddress = builder.Configuration[&quot;redisHost&quot;];
+    orleansBuilder.UseRedisClustering(options =&gt; options.ConnectionString = redisAddress);
+    orleansBuilder.AddRedisGrainStorage(&quot;votes&quot;, options =&gt; options.ConnectionString = redisAddress);
+});
+var app = builder.Build();
+app.Run();
+</code></pre>
+<p>Client:</p>
+<pre><code class="language-c#">//File:Program.cs
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using IGrain;
+using System.Net;
+var config = new ServiceCollection()
+    .AddSingleton&lt;IConfiguration&gt;(serviceProvider =&gt;
+    {
+        IConfigurationBuilder configurationBuilder = new ConfigurationBuilder();
+        configurationBuilder.AddEnvironmentVariables();
+        if (args != null)
+        {
+            configurationBuilder.AddCommandLine(args);
+        }
+        return configurationBuilder.Build();
+    })
+    .BuildServiceProvider().GetService&lt;IConfiguration&gt;();
+Thread.Sleep(5000);//docker直接跑的话，有可能Server没跑起来Client就已经准备去连接了
+try
+{
+    IHost host = await StartClientAsync(config[&quot;redisHost&quot;] ?? &quot;127.0.0.1:6379&quot;);
+    IClusterClient client = host.Services.GetRequiredService&lt;IClusterClient&gt;();
+    //下面做一些事情
+    await DoClientWorkAsync(client);
+    while (true)
+    {
+        await Task.Delay(5000);
+        await DoClientWorkAsync(client);
+    }
+    await host.StopAsync();
+    return 0;
+}
+catch (Exception e)
+{
+    Console.WriteLine($$&quot;&quot;&quot;
+        Exception while trying to run client: {{e.Message}}
+        Make sure the silo the client is trying to connect to is running.
+        Press any key to exit.
+        &quot;&quot;&quot;);
+    return 1;
+}
+
+static async Task&lt;IHost&gt; StartClientAsync(string redisHost)
+{
+    var redisAddress = redisHost;
+    var builder = new HostBuilder()
+        .UseOrleansClient(client =&gt;
+        {
+            client.UseRedisClustering(options =&gt; options.ConnectionString = redisAddress);
+        })
+        .ConfigureLogging(logging =&gt; logging.AddConsole());
+
+    var host = builder.Build();
+    await host.StartAsync();
+    Console.WriteLine(&quot;Client successfully connected to silo host \n&quot;);
+    return host;
+}
+
+static async Task DoClientWorkAsync(IClusterClient client)
+{
+    var friend = client.GetGrain&lt;IMessageHandler&gt;(0);
+    var result = await friend.Send(new Model.Message
+    {
+        Ip = Dns.GetHostName()
+    });
+}
+</code></pre>
+<h2 id="项目发布">项目发布</h2>
+<h3 id="publish">publish</h3>
+<p>在根目录创建<code>publish.bat</code></p>
+<pre><code class="language-bat">dotnet publish Server -o server_publish
+dotnet publish Client -o client_publish
+</code></pre>
+<p>执行<code>./publish</code></p>
+<h3 id="dockerfile">dockerfile</h3>
+<p>dockerfile_client:</p>
+<pre><code>FROM mcr.microsoft.com/dotnet/aspnet:7.0
+COPY client_publish /app
+WORKDIR /app
+EXPOSE 80/tcp
+ENTRYPOINT [&quot;dotnet&quot;, &quot;Client.dll&quot;]
+</code></pre>
+<p>dockerfile_server</p>
+<pre><code>FROM mcr.microsoft.com/dotnet/aspnet:7.0
+COPY server_publish /app
+WORKDIR /app
+EXPOSE 80/tcp
+ENTRYPOINT [&quot;dotnet&quot;, &quot;Server.dll&quot;]
+</code></pre>
+<h3 id="docker-compose">docker-compose</h3>
+<pre><code>version: '3'
+services:
+  redis:
+    image: redis:latest
+  server:
+    build:
+      context: ./
+      dockerfile: ./dockerfile_server
+    depends_on:
+      - redis
+    environment:
+      - redisHost=redis:6379
+  client:
+    build:
+      context: ./
+      dockerfile: ./dockerfile_client
+    depends_on:
+      - server
+    environment:
+      - redisHost=redis:6379
+</code></pre>
+<p>执行<code>docker compose up --scale client=3 --scale server=2</code></p>
+<h2 id="效果展示">效果展示</h2>
+<p><img src="https://img2023.cnblogs.com/blog/2692182/202303/2692182-20230320214127512-223136168.png" alt="" loading="lazy"><br>
+我们关闭server2后，发现他会自动选举别的server<br>
+<img src="https://img2023.cnblogs.com/blog/2692182/202303/2692182-20230320214150954-766066657.png" alt="" loading="lazy"></p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[linq.js - LINQ for JavaScript ]]></title>
+        <id>https://zhsun999.github.io/post/linqjs-linq-for-javascript/</id>
+        <link href="https://zhsun999.github.io/post/linqjs-linq-for-javascript/">
+        </link>
+        <updated>2023-02-14T14:27:31.000Z</updated>
+        <content type="html"><![CDATA[<p>这里给大家推荐个js实现的linq，项目地址:<a href="https://github.com/mihaifm/linq">mihaifm/linq</a></p>
+<h3 id="使用举例">使用举例</h3>
+<pre><code class="language-js">let strs = ['a', 'b', 'c', 'd', 'e']
+Enumerable.from(strs)
+    .select((str, index) =&gt; ({
+        str: str,
+        index: index
+    }))
+    .where(obj =&gt; obj.index &gt; 2)
+    .forEach(obj =&gt; console.log(obj))
+//output
+//{ str: 'd', index: 3 }
+//{ str: 'e', index: 4 }
+</code></pre>
+<h3 id="优点">优点</h3>
+<ul>
+<li>对于.net开发人员很快就能上手</li>
+<li>相比es6的map/reduce额外有更多的方法，如计数、分组、连接、交集差集等，能够更方便的处理数据</li>
+</ul>
+<pre><code class="language-js">//对比统计大于2的number的方式
+let data = Enumerable.range(1, 5).toArray()
+console.log(
+    data.map(num =&gt; num &gt; 2 ? 1 : 0)
+        .reduce((num1, num2) =&gt; num1 + num2)
+)
+console.log(
+    Enumerable.from(data)
+        .count(num =&gt; num &gt; 2)
+)
+//output
+//3
+//3
+</code></pre>
+<h3 id="安装使用">安装使用</h3>
+<p>执行<code>npm install linq</code>安装<br>
+引入<code>import Enumerable from &quot;linq&quot;</code>(node使用的话，在package.json中配置&quot;type&quot;: &quot;module&quot;)</p>
+<h3 id="一些使用举例">一些使用举例</h3>
+<pre><code class="language-js">//集合操作
+let data1 = [1, 2, 2, 3]
+let data2 = [2, 3, 4]
+console.log(
+    Enumerable.from(data1).distinct().toArray(),                        //去重
+    Enumerable.from(data1).concat(Enumerable.from(data2)).toArray(),    //交集不去重
+    Enumerable.from(data1).union(Enumerable.from(data2)).toArray(),     //交集并去重
+    Enumerable.from(data1).intersect(Enumerable.from(data2)).toArray(), //并集
+    Enumerable.from(data1).except(Enumerable.from(data2)).toArray(),    //差集
+)
+</code></pre>
+<pre><code class="language-js">//分组
+var data = [
+    {
+        &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+        &quot;name&quot;: &quot;zhsun&quot;,
+        &quot;operation&quot;: &quot;signIn&quot;
+    }, {
+        &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+        &quot;name&quot;: &quot;zhsun&quot;,
+        &quot;operation&quot;: &quot;signOut&quot;
+    }
+]
+console.log(
+    Enumerable.from(data)
+        .groupBy(obj =&gt; obj.name)
+        .select(igp =&gt; ({ name: igp.key(), count: igp.count() }))
+        .toArray()
+)
+//注意，不同于c#的是，如果keySelector是一个object，需要自己去实现compareSelector
+console.log(
+    Enumerable.from(data)
+        .groupBy(obj =&gt; ({ date: obj.date, name: obj.name }),                                    //key Selector 
+            obj =&gt; obj.operation,                                                                //element Selector 
+            (key, operations) =&gt; ({ name: key.name, date: key.date, count: operations.count() }),//result Selector  
+            key =&gt; JSON.stringify(key)                                                           //compare Selector 
+        )
+        .toArray()
+)
+//output
+//[ { name: 'zhsun', count: 2 } ]
+//[ { name: 'zhsun', date: '2022-08-08 00:15:20', count: 2 } ]
+</code></pre>
+<pre><code class="language-js">//连接
+let data1 = [{
+    &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+    &quot;name&quot;: &quot;zhsun&quot;,
+    &quot;roleId&quot;: 2
+}, {
+    &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+    &quot;name&quot;: &quot;fqh&quot;,
+    &quot;roleId&quot;: 1
+}, {
+    &quot;date&quot;: &quot;2022-08-08 00:15:20&quot;,
+    &quot;name&quot;: &quot;pp&quot;,
+    &quot;roleId&quot;: 3
+},]
+let data2 = [{
+    &quot;roleId&quot;: 1,
+    &quot;role&quot;: &quot;admin&quot;
+}, {
+    &quot;roleId&quot;: 2,
+    &quot;role&quot;: &quot;user&quot;
+}]
+console.log(
+    Enumerable.from(data1)
+        .join(data2,
+            obj1 =&gt; obj1.roleId,
+            obj2 =&gt; obj2.roleId,
+            (obj1, obj2) =&gt; ({
+                date: obj1.date,
+                name: obj1.name,
+                role: obj2.role
+            })
+        )
+        .toArray()
+)
+//output
+//[
+//  { date: '2022-08-08 00:15:20', name: 'zhsun', role: 'user' },
+//  { date: '2022-08-08 00:15:20', name: 'fqh', role: 'admin' }  
+//]
+</code></pre>
+<p>大部分c# linq的方法都有实现，使用方式也大致相仿，可以从<a href="https://learn.microsoft.com/zh-cn/dotnet/api/system.linq.enumerable.aggregate?view=net-7.0">MSDN-Enumerable.Aggregate 方法</a>开始阅读了解</p>
+<h3 id="项目中的使用">项目中的使用</h3>
+<p>目前为止，我主要用在了以下两个方面</p>
+<ul>
+<li>前端数据可视化时可能需要进行复杂数据转换，如用户以不同的key去groupBy绘制图表</li>
+<li>写node脚本时简化数据转换的操作</li>
+</ul>
+<h3 id="其他">其他</h3>
+<p>如果觉得这个库太小众，可以考虑<a href="https://www.lodashjs.com/">lodash</a></p>
+]]></content>
+    </entry>
+</feed>
