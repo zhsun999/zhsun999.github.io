@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://https://github.com/zhsun999/zhsun999.github.io</id>
+    <title>zhsun</title>
+    <updated>2025-06-22T11:24:15.869Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="https://https://github.com/zhsun999/zhsun999.github.io"/>
+    <link rel="self" href="https://https://github.com/zhsun999/zhsun999.github.io/atom.xml"/>
+    <subtitle>温故而知新</subtitle>
+    <logo>https://https://github.com/zhsun999/zhsun999.github.io/images/avatar.png</logo>
+    <icon>https://https://github.com/zhsun999/zhsun999.github.io/favicon.ico</icon>
+    <rights>All rights reserved 2025, zhsun</rights>
+    <entry>
+        <title type="html"><![CDATA[DotNet平台几个有意思的Http请求库]]></title>
+        <id>https://https://github.com/zhsun999/zhsun999.github.io/post/dotnet-ping-tai-ji-ge-you-yi-si-de-http-qing-qiu-ku/</id>
+        <link href="https://https://github.com/zhsun999/zhsun999.github.io/post/dotnet-ping-tai-ji-ge-you-yi-si-de-http-qing-qiu-ku/">
+        </link>
+        <updated>2025-06-22T03:33:24.000Z</updated>
+        <content type="html"><![CDATA[<p>假设我有以下接口</p>
+<pre><code class="language-csharp">var app = WebApplication.CreateBuilder().Build();
+app.MapGet(&quot;/user/{id}&quot;, ([FromRoute] int id) =&gt; new User
+{
+	Name = $&quot;zhangsan{id}&quot;,
+	Id = id
+});
+app.MapPost(&quot;/user&quot;, (User user) =&gt; user);
+app.Run();
+
+public class User
+{
+	public string Name { get; set; }
+	public int Id { get; set; }
+}
+</code></pre>
+<h1 id="flurlhttp">Flurl.Http</h1>
+<blockquote>
+<p>基于扩展方法，小白也能点点点把代码写完</p>
+</blockquote>
+<p>关键词：<strong>Fluent</strong><br>
+git : <a href="https://github.com/tmenier/Flurl">Flurl</a></p>
+<pre><code class="language-csharp">var id =1;
+var user1 = await $&quot;http://localhost:5000/user/{id}&quot;.GetJsonAsync&lt;User&gt;();
+var user2 = await $&quot;http://localhost:5000/user&quot;.PostJsonAsync(user1).ReceiveJson&lt;User&gt;();
+</code></pre>
+<h1 id="refit">Refit</h1>
+<blockquote>
+<p>基于源生成器，只需要定义接口，同时对依赖注入是最友好的</p>
+</blockquote>
+<p>关键词：<strong>Interface</strong>,<strong>Source Generator</strong>,<strong>DI</strong><br>
+git : <a href="https://github.com/reactiveui/refit">refit</a></p>
+<pre><code class="language-csharp">using Microsoft.Extensions.DependencyInjection;
+using Refit;
+
+var sc = new ServiceCollection();
+sc.AddRefitClient&lt;IMyService&gt;().ConfigureHttpClient(c =&gt; { c.BaseAddress = new Uri(&quot;http://localhost:5000&quot;); });
+var sp = sc.BuildServiceProvider();
+var myService = sp.GetRequiredService&lt;IMyService&gt;();
+var id = 1;
+var user1 = await myService.GetUserAsync(1);
+var user2 = await myService.AddUserAsync(user1);
+
+public interface IMyService
+{
+    [Get(&quot;/user/{id}&quot;)]
+    Task&lt;User&gt; GetUserAsync(int id);
+
+    [Post(&quot;/user&quot;)]
+    Task&lt;User&gt; AddUserAsync(User user);
+}
+</code></pre>
+<h1 id="fshttp">FsHttp</h1>
+<blockquote>
+<p>F#语言的请求包库，写起来很优雅</p>
+</blockquote>
+<p>关键词：<strong>FSharp</strong>,<strong>DSL</strong><br>
+git：<a href="https://github.com/fsprojects/FsHttp">FsHttp</a></p>
+<pre><code class="language-fsharp">type User = { name: string; id: int }
+
+let userId = 1
+let user1 =
+    http {
+        GET $&quot;http://localhost:5000/user/{userId}&quot;
+    }
+    |&gt; Request.send
+    |&gt; Response.deserializeJson&lt;User&gt;
+let user2 =
+    http {
+        POST &quot;http://localhost:5000/user&quot;
+        body
+        jsonSerialize user1
+    }
+    |&gt; Request.send
+    |&gt; Response.deserializeJson&lt;User&gt;
+</code></pre>
+]]></content>
+    </entry>
+</feed>
